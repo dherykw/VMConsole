@@ -1,0 +1,150 @@
+#!/bin/bash
+
+###############################################################################
+##
+## Sencillo Script que sirve para realizar sencilas operaciones sobre las 
+## máquinas virtuales instaladas en nuestro sistema a través de vistualbox
+## como apagar encender o reiniar, todas estas se ejecutarán sin entorno 
+## gráfico ya que la idea es usar el script para arrancar servidores
+##
+###############################################################################
+
+nMaquinas=`VBoxManage list vms | wc -l` 
+uidMaquinas=(`VBoxManage list vms | tr " " "\n"  | grep {`)
+txtArrancada="echo La maquina seleccionada ya estaba arrancada"
+txtApagada="echo La maquina seleccionada no estaba arrancada"
+cabecera="#########################################"
+txtCabecera="##\tSCRIPT\tVBOX\tCONSOLA\t\t##"
+cabecerafin="#########################################\n"
+
+n=0
+while read i
+do
+    maquinas[$n]=$i;  
+    let n=$n+1
+done < <(VBoxManage list vms | cut -d "{" -f 1)
+
+function imprime_cabecera
+{
+    echo
+    echo -e " $cabecera"
+    echo -e " $txtCabecera"
+    echo -e " $cabecerafin"
+}
+
+function imprime_menu
+{
+    clear
+    imprime_cabecera
+    echo " 1) Arrancar Máquina"
+    echo " 2) Reiniciar Máquina"
+    echo " 3) Apagar Máquina"
+    echo -e "\n 0) Salir"
+}
+
+function imprime_menu_maquina 
+{
+    clear
+    imprime_cabecera
+    for (( i=0 ; i<nMaquinas ; i++  ))
+    do
+        let n=($i+1)
+        uid=${uidMaquinas[$i]}
+
+        if VBoxManage list runningvms | grep -q $uid
+        then
+            echo " $n) ${maquinas[$i]} → (Activa)"
+        else
+            echo " $n) ${maquinas[$i]}" 
+        fi
+       
+    done
+
+    echo -e "\n 0) Salir"
+
+    echo -e -n "\n Introduzca una opción: " 
+    read -n 1 maquina
+}
+
+
+function control
+{
+    if VBoxManage list runningvms | grep -q $uid
+    then
+        if [ "$1" == "poweroff" ]; then
+            clear
+        fi
+        echo "VBoxManage controlvm $nombre $1" | bash
+        sleep 1.5
+    else
+        $txtApagada 
+    fi
+}
+
+
+function arranca
+{
+    if VBoxManage list runningvms | grep -q $uid
+    then
+        $txtArrancada
+    else
+        echo "VBoxHeadless -s $nombre -v off &" | bash > /dev/null
+    fi
+}
+
+
+function control_maquina 
+{
+while :
+do 
+
+imprime_menu_maquina
+
+case $maquina in
+    0) return
+    ;;
+    ?) if [ $maquina -le $nMaquinas ] && [ $maquina -gt 0 ]
+       then
+           let maquina=($maquina-1)
+           nombre=${maquinas[$maquina]}
+           uid=${uidMaquinas[$maquina]}
+
+           echo Ha seleccionado la maquina: $nombre con uid $uid
+           if [ "$1" == "control" ]
+           then
+                control $2
+           else
+                arranca
+           fi    
+           
+           return
+       else 
+           echo "El numero elegido no corresponde a ninguna máquina"
+       fi
+    ;;
+esac
+    done
+}
+
+
+for (( ; ; ))
+do
+    imprime_menu
+
+    echo -e -n "\n Introduzca una opción: " 
+    read -n 1 i
+    case $i in
+        1) control_maquina "arranca"
+        ;;
+        2) control_maquina "control" "reset"
+        ;;
+        3) control_maquina "control" "poweroff"
+        ;;
+        0) clear
+        break
+        ;;
+        ?) 
+        ;;
+    esac
+done
+
